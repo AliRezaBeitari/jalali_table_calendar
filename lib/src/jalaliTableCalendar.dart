@@ -424,8 +424,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void initState() {
     super.initState();
     // Initially display the pre-selected date.
-    // final int monthPage = _monthDelta(widget.firstDate, widget.selectedDate); FIXME
-    final int monthPage = 1;
+    final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
     _dayPickerController = PageController(initialPage: monthPage);
     _handleMonthPageChanged(monthPage);
     _updateCurrentDate();
@@ -441,8 +440,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void didUpdateWidget(CalendarMonthPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(widget.selectedDates, oldWidget.selectedDates)) {
-      // final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates); FIXME
-      final int monthPage = 1;
+      final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
       _dayPickerController = PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     }
