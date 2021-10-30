@@ -1,33 +1,15 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:jalali_table_calendar/src/persian_date.dart';
-
-/// Initial display mode of the date picker calendar.
-///
-/// Date picker UI mode for either showing a list of available years or a
-/// monthly calendar initially in the calendar shown by calling [showDatePicker].
-///
-/// Also see:
-///
-///  * <https://material.io/guidelines/components/pickers.html#pickers-date-pickers>
-enum DatePickerModeCalendar {
-  /// Show a date picker UI for choosing a month and day.
-  day,
-
-  /// Show a date picker UI for choosing a year.
-  year,
-}
 
 bool calendarInitialized = false;
 //callback function when user change day
 typedef void OnDaySelected(DateTime day);
-//callback function for create marker
-typedef MarkerBuilder = Widget Function(DateTime date, List events);
 
 const Duration _kMonthScrollDuration = Duration(milliseconds: 200);
 const double _kDayPickerRowHeight = 50.0;
@@ -79,35 +61,26 @@ class CalendarDayPicker extends StatelessWidget {
   /// Rarely used directly. Instead, typically used as part of a [CalendarMonthPicker].
   CalendarDayPicker({
     Key key,
-    @required this.selectedDate,
+    @required this.selectedDates,
     @required this.currentDate,
     @required this.onChanged,
     @required this.firstDate,
     @required this.lastDate,
     @required this.displayedMonth,
-    this.marker,
-    this.events,
     this.selectableDayPredicate,
-  })  : assert(selectedDate != null),
+  })  : assert(selectedDates != null),
         assert(currentDate != null),
         assert(onChanged != null),
         assert(displayedMonth != null),
         assert(!firstDate.isAfter(lastDate)),
-        assert(selectedDate.isAfter(firstDate) ||
-            selectedDate.isAtSameMomentAs(firstDate)),
+        assert(selectedDates.every(
+            (d) => d.isAfter(firstDate) || d.isAtSameMomentAs(firstDate))),
         super(key: key);
 
-  //days marker
-  final MarkerBuilder marker;
-
-  /// `Map` of events.
-  /// Each `DateTime` inside this `Map` should get its own `List` of objects (i.e. events).
-  final Map<DateTime, List> events;
-
-  /// The currently selected date.
+  /// The list of currently selected dates.
   ///
-  /// This date is highlighted in the picker.
-  final DateTime selectedDate;
+  /// These dates are highlighted in the picker.
+  final List<DateTime> selectedDates;
 
   /// The current date at the time the picker is displayed.
   final DateTime currentDate;
@@ -255,8 +228,10 @@ class CalendarDayPicker extends StatelessWidget {
 
     final PersianDate getPearData =
         PersianDate.pDate(gregorian: displayedMonth.toString());
-    final PersianDate selectedPersianDate =
-        PersianDate.pDate(gregorian: selectedDate.toString());
+
+    final List<PersianDate> selectedPersianDates = selectedDates
+        .map<PersianDate>((d) => PersianDate.pDate(gregorian: d.toString()))
+        .toList();
 
     final PersianDate currentPDate =
         PersianDate.pDate(gregorian: currentDate.toString());
@@ -294,15 +269,16 @@ class CalendarDayPicker extends StatelessWidget {
         final bool disabled = dayToBuild.isAfter(lastDate) ||
             dayToBuild.isBefore(firstDate) ||
             (selectableDayPredicate != null &&
-                !selectableDayPredicate(dayToBuild));
+                !selectableDayPredicate([dayToBuild]));
 
         BoxDecoration decoration;
         TextStyle itemStyle = themeData.textTheme.bodyText1;
 
-        final bool isSelectedDay =
-            selectedPersianDate.year == getPearData.year &&
-                selectedPersianDate.month == getPearData.month &&
-                selectedPersianDate.day == day;
+        final bool isSelectedDay = selectedPersianDates.any((d) =>
+            d.year == getPearData.year &&
+            d.month == getPearData.month &&
+            d.day == day);
+
         if (isSelectedDay) {
           // The selected day gets a circle background highlight, and a contrasting text color.
           itemStyle = themeData.textTheme.bodyText2;
@@ -315,44 +291,30 @@ class CalendarDayPicker extends StatelessWidget {
             currentPDate.month == getPearData.month &&
             currentPDate.day == day) {
           // The current day gets a different text color.
-          itemStyle =
-              themeData.textTheme.bodyText2.copyWith(color: themeData.colorScheme.secondary);
+          itemStyle = themeData.textTheme.bodyText2
+              .copyWith(color: themeData.colorScheme.secondary);
         } else if (getHoliday.isHoliday) {
           // The current day gets a different text color.
           itemStyle = themeData.textTheme.bodyText2.copyWith(color: Colors.red);
         }
 
-        // prepare to events to return to view
-        List dayEvents = [];
-        if (events[dayToBuild] != null) dayEvents = events[dayToBuild];
-        //get Marker for day
-        Widget mark = marker(dayToBuild, dayEvents);
         Widget dayWidget = Container(
           decoration: decoration,
-          child: Stack(
-            children: [
-              Center(
-                child: Semantics(
-                  // We want the day of month to be spoken first irrespective of the
-                  // locale-specific preferences or TextDirection. This is because
-                  // an accessibility user is more likely to be interested in the
-                  // day of month before the rest of the date, as they are looking
-                  // for the day of month. To do that we prepend day of month to the
-                  // formatted full date.
-                  label:
-                      '${localizations.formatDecimal(day)}, ${localizations.formatFullDate(dayToBuild)}',
-                  selected: isSelectedDay,
-                  child: ExcludeSemantics(
-                    child: Text(day.toString(),
-                        style: itemStyle),
-                  ),
-                ),
+          child: Center(
+            child: Semantics(
+              // We want the day of month to be spoken first irrespective of the
+              // locale-specific preferences or TextDirection. This is because
+              // an accessibility user is more likely to be interested in the
+              // day of month before the rest of the date, as they are looking
+              // for the day of month. To do that we prepend day of month to the
+              // formatted full date.
+              label:
+                  '${localizations.formatDecimal(day)}, ${localizations.formatFullDate(dayToBuild)}',
+              selected: isSelectedDay,
+              child: ExcludeSemantics(
+                child: Text(day.toString(), style: itemStyle),
               ),
-              if (marker != null &&
-                  events != null &&
-                  events[dayToBuild] != null)
-                mark
-            ],
+            ),
           ),
         );
 
@@ -419,31 +381,22 @@ class CalendarMonthPicker extends StatefulWidget {
   /// by [showDatePicker].
   CalendarMonthPicker({
     Key key,
-    @required this.selectedDate,
+    @required this.selectedDates,
     @required this.onChanged,
     @required this.firstDate,
     @required this.lastDate,
-    this.marker,
-    this.events,
     this.selectableDayPredicate,
-  })  : assert(selectedDate != null),
+  })  : assert(selectedDates != null),
         assert(onChanged != null),
         assert(!firstDate.isAfter(lastDate)),
-        assert(selectedDate.isAfter(firstDate) ||
-            selectedDate.isAtSameMomentAs(firstDate)),
+        assert(selectedDates.every(
+            (d) => d.isAfter(firstDate) || d.isAtSameMomentAs(firstDate))),
         super(key: key);
 
-  //day marker
-  final MarkerBuilder marker;
-
-  /// `Map` of events.
-  /// Each `DateTime` inside this `Map` should get its own `List` of objects (i.e. events).
-  final Map<DateTime, List> events;
-
-  /// The currently selected date.
+  /// The list of currently selected dates.
   ///
-  /// This date is highlighted in the picker.
-  final DateTime selectedDate;
+  /// These dates are highlighted in the picker.
+  final List<DateTime> selectedDates;
 
   /// Called when the user picks a month.
   final ValueChanged<DateTime> onChanged;
@@ -471,7 +424,8 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void initState() {
     super.initState();
     // Initially display the pre-selected date.
-    final int monthPage = _monthDelta(widget.firstDate, widget.selectedDate);
+    // final int monthPage = _monthDelta(widget.firstDate, widget.selectedDate); FIXME
+    final int monthPage = 1;
     _dayPickerController = PageController(initialPage: monthPage);
     _handleMonthPageChanged(monthPage);
     _updateCurrentDate();
@@ -486,8 +440,9 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   @override
   void didUpdateWidget(CalendarMonthPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedDate != oldWidget.selectedDate) {
-      final int monthPage = _monthDelta(widget.firstDate, widget.selectedDate);
+    if (!listEquals(widget.selectedDates, oldWidget.selectedDates)) {
+      // final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates); FIXME
+      final int monthPage = 1;
       _dayPickerController = PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     }
@@ -540,44 +495,42 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   Widget _buildItems(BuildContext context, int index) {
     DateTime month = _addMonthsToMonthDate(widget.firstDate, index);
 
-    final PersianDate selectedPersianDate = PersianDate.pDate(
+    // FIXME
+    /*final PersianDate selectedPersianDate = PersianDate.pDate(
         gregorian: widget.selectedDate.toString()); // To Edit Month Display
 
     if (selectedPersianDate.day >= 1 &&
-        selectedPersianDate.day < 12 && !calendarInitialized) {
+        selectedPersianDate.day < 12 &&
+        !calendarInitialized) {
       month = _addMonthsToMonthDate(widget.firstDate, index + 1);
-      _handleNextMonth(initialized:false);
-    }
+      _handleNextMonth(initialized: false);
+    }*/
 
     // if (!widget.isSelected && !changed) {
     // }
     calendarInitialized = true;
     return CalendarDayPicker(
-      selectedDate: widget.selectedDate,
+      selectedDates: widget.selectedDates,
       currentDate: _todayDate,
       onChanged: widget.onChanged,
       firstDate: widget.firstDate,
-      marker: widget.marker,
       lastDate: widget.lastDate,
-      events: widget.events,
       displayedMonth: month,
       selectableDayPredicate: widget.selectableDayPredicate,
     );
   }
 
-  void _handleNextMonth({initialized=true}) async {
+  void _handleNextMonth({initialized = true}) async {
     if (!_isDisplayingLastMonth) {
-      SemanticsService.announce(
-          localizations.formatMonthYear(_nextMonthDate), textDirection);
       _dayPickerController.nextPage(
-          duration: initialized?_kMonthScrollDuration:Duration(milliseconds: 1), curve: Curves.ease);
+          duration:
+              initialized ? _kMonthScrollDuration : Duration(milliseconds: 1),
+          curve: Curves.ease);
     }
   }
 
   void _handlePreviousMonth() {
     if (!_isDisplayingFirstMonth) {
-      SemanticsService.announce(
-          localizations.formatMonthYear(_previousMonthDate), textDirection);
       _dayPickerController.previousPage(
           duration: _kMonthScrollDuration, curve: Curves.ease);
     }
@@ -677,7 +630,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void dispose() {
     _timer?.cancel();
     _dayPickerController?.dispose();
-    calendarInitialized=false;
+    calendarInitialized = false;
     super.dispose();
   }
 }
@@ -692,141 +645,30 @@ class _MonthPickerSortKey extends OrdinalSortKey {
   static const _MonthPickerSortKey calendar = _MonthPickerSortKey(3.0);
 }
 
-/// A scrollable list of years to allow picking a year.
-///
-/// The year picker widget is rarely used directly. Instead, consider using
-/// [showDatePicker], which creates a date picker calendar.
-///
-/// Requires one of its ancestors to be a [Material] widget.
-///
-/// See also:
-///
-///  * [showDatePicker]
-///  * <https://material.google.com/components/pickers.html#pickers-date-pickers>
-class CalendarYearPicker extends StatefulWidget {
-  /// Creates a year picker.
-  ///
-  /// The [selectedDate] and [onChanged] arguments must not be null. The
-  /// [lastDate] must be after the [firstDate].
-  ///
-  /// Rarely used directly. Instead, typically used as part of the calendar shown
-  /// by [showDatePicker].
-  CalendarYearPicker({
-    Key key,
-    @required this.selectedDate,
-    @required this.onChanged,
-    @required this.firstDate,
-    @required this.lastDate,
-  })  : assert(selectedDate != null),
-        assert(onChanged != null),
-        assert(!firstDate.isAfter(lastDate)),
-        super(key: key);
-
-  /// The currently selected date.
-  ///
-  /// This date is highlighted in the picker.
-  final DateTime selectedDate;
-
-  /// Called when the user picks a year.
-  final ValueChanged<DateTime> onChanged;
-
-  /// The earliest date the user is permitted to pick.
-  final DateTime firstDate;
-
-  /// The latest date the user is permitted to pick.
-  final DateTime lastDate;
-
-  @override
-  _CalendarYearPickerState createState() => _CalendarYearPickerState();
-}
-
-class _CalendarYearPickerState extends State<CalendarYearPicker> {
-  static const double _itemExtent = 50.0;
-  ScrollController scrollController;
-
-  @override
-  void initState() {
-    super.initState();
-    scrollController = ScrollController(
-      // Move the initial scroll position to the currently selected date's year.
-      initialScrollOffset:
-          (widget.selectedDate.year - widget.firstDate.year) * _itemExtent,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    assert(debugCheckHasMaterial(context));
-    final ThemeData themeData = Theme.of(context);
-    final TextStyle style = themeData.textTheme.bodyText1;
-
-    return ListView.builder(
-      controller: scrollController,
-      itemExtent: _itemExtent,
-      itemCount: widget.lastDate.year - widget.firstDate.year + 1,
-      itemBuilder: (BuildContext context, int index) {
-        final int year = widget.firstDate.year + index;
-        final bool isSelected = year == widget.selectedDate.year;
-        var date =
-            DateTime(year, widget.selectedDate.month, widget.selectedDate.day);
-        var pYear = PersianDate.pDate(gregorian: date.toString());
-        final TextStyle itemStyle = isSelected
-            ? themeData.textTheme.headline1
-                .copyWith(color: themeData.colorScheme.secondary)
-            : style;
-        return InkWell(
-          key: ValueKey<int>(year),
-          onTap: () {
-            widget.onChanged(DateTime(
-                year, widget.selectedDate.month, widget.selectedDate.day));
-          },
-          child: Center(
-            child: Semantics(
-              selected: isSelected,
-              child: Text(pYear.year.toString(), style: itemStyle),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _DatePickerCalendar extends StatefulWidget {
   const _DatePickerCalendar(
       {Key key,
-      this.initialDate,
+      this.initialDates,
       this.firstDate,
       this.lastDate,
       this.selectableDayPredicate,
-      this.initialDatePickerMode,
       this.selectedFormat,
       this.showTimePicker,
       this.convertToGregorian,
       this.initialTime,
       this.onDaySelected,
-      this.marker,
-      this.events,
       this.hour24Format})
       : super(key: key);
 
-  final DateTime initialDate;
+  final List<DateTime> initialDates;
   final DateTime firstDate;
   final DateTime lastDate;
   final CalendarSelectableDayPredicate selectableDayPredicate;
-  final DatePickerModeCalendar initialDatePickerMode;
   final String selectedFormat;
   final bool convertToGregorian;
   final bool showTimePicker;
   final bool hour24Format;
   final TimeOfDay initialTime;
-
-  //day marker
-  final MarkerBuilder marker;
-
-  /// `Map` of events.
-  /// Each `DateTime` inside this `Map` should get its own `List` of objects (i.e. events).
-  final Map<DateTime, List> events;
 
   /// Called whenever any day gets tapped.
   final OnDaySelected onDaySelected;
@@ -836,89 +678,42 @@ class _DatePickerCalendar extends StatefulWidget {
 }
 
 class _DatePickerCalendarState extends State<_DatePickerCalendar> {
-  @override
-  void initState() {
-    super.initState();
-    _selectedDate = widget.initialDate;
-    _mode = widget.initialDatePickerMode;
-  }
-
-  bool _announcedInitialDate = false;
+  List<DateTime> _selectedDates;
+  final GlobalKey _pickerKey = GlobalKey();
 
   MaterialLocalizations localizations;
   TextDirection textDirection;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    localizations = MaterialLocalizations.of(context);
-    textDirection = Directionality.of(context);
-    if (!_announcedInitialDate) {
-      _announcedInitialDate = true;
-      SemanticsService.announce(
-        localizations.formatFullDate(_selectedDate),
-        textDirection,
-      );
-    }
-  }
-
-  DateTime _selectedDate;
-  DatePickerModeCalendar _mode;
-  final GlobalKey _pickerKey = GlobalKey();
-
-  void _vibrate() {
-    switch (Theme.of(context).platform) {
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-        HapticFeedback.vibrate();
-        break;
-      case TargetPlatform.iOS:
-        break;
-      default:
-        break;
-    }
-  }
-
-  void _handleYearChanged(DateTime value) {
-    _vibrate();
-    setState(() {
-      _mode = DatePickerModeCalendar.day;
-      _selectedDate = value;
-    });
+  void initState() {
+    super.initState();
+    _selectedDates = widget.initialDates;
   }
 
   void _handleDayChanged(DateTime value) {
     if (widget.onDaySelected != null) widget.onDaySelected(value);
-    _vibrate();
+
+    final index = _selectedDates.indexWhere((d) =>
+        d.year == value.year && d.month == value.month && d.day == value.day);
+
     setState(() {
-      _selectedDate = value;
+      if (index >= 0) {
+        _selectedDates.removeAt(index);
+      } else {
+        _selectedDates.add(value);
+      }
     });
   }
 
   Widget _buildWidget() {
-    assert(_mode != null);
-    switch (_mode) {
-      case DatePickerModeCalendar.day:
-        return CalendarMonthPicker(
-          key: _pickerKey,
-          selectedDate: _selectedDate,
-          onChanged: _handleDayChanged,
-          marker: widget.marker,
-          events: widget.events,
-          firstDate: widget.firstDate,
-          lastDate: widget.lastDate,
-          selectableDayPredicate: widget.selectableDayPredicate,
-        );
-      case DatePickerModeCalendar.year:
-        return CalendarYearPicker(
-          key: _pickerKey,
-          selectedDate: _selectedDate,
-          onChanged: _handleYearChanged,
-          firstDate: widget.firstDate,
-          lastDate: widget.lastDate,
-        );
-    }
-    return null;
+    return CalendarMonthPicker(
+      key: _pickerKey,
+      selectedDates: _selectedDates,
+      onChanged: _handleDayChanged,
+      firstDate: widget.firstDate,
+      lastDate: widget.lastDate,
+      selectableDayPredicate: widget.selectableDayPredicate,
+    );
   }
 
   @override
@@ -947,7 +742,7 @@ class _DatePickerCalendarState extends State<_DatePickerCalendar> {
 /// Signature for predicating dates for enabled date selections.
 ///
 /// See [showDatePicker].
-typedef CalendarSelectableDayPredicate = bool Function(DateTime day);
+typedef CalendarSelectableDayPredicate = bool Function(List<DateTime> days);
 
 /// Shows a dialog containing a material design date picker.
 ///
@@ -980,7 +775,6 @@ typedef CalendarSelectableDayPredicate = bool Function(DateTime day);
 Widget jalaliCalendar({
   @required BuildContext context,
   CalendarSelectableDayPredicate selectableDayPredicate,
-  DatePickerModeCalendar initialDatePickerMode = DatePickerModeCalendar.day,
   String selectedFormat,
   bool toArray,
   Locale locale,
@@ -989,38 +783,31 @@ Widget jalaliCalendar({
   bool showTimePicker = false,
   bool hour24Format = false,
   TimeOfDay initialTime,
-  MarkerBuilder marker,
-  Map<DateTime, List> events,
   OnDaySelected onDaySelected,
 }) {
-  DateTime initialDate = DateTime.now();
+  List<DateTime> initialDates = [DateTime.now()];
   DateTime firstDate = DateTime(1700);
   DateTime lastDate = DateTime(2200);
 
-  assert(!initialDate.isBefore(firstDate),
+  assert(!initialDates.any((d) => d.isBefore(firstDate)),
       'initialDate must be on or after firstDate');
-  assert(!initialDate.isAfter(lastDate),
+  assert(!initialDates.any((d) => d.isAfter(lastDate)),
       'initialDate must be on or before lastDate');
   assert(
       !firstDate.isAfter(lastDate), 'lastDate must be on or after firstDate');
-  assert(selectableDayPredicate == null || selectableDayPredicate(initialDate),
+  assert(selectableDayPredicate == null || selectableDayPredicate(initialDates),
       'Provided initialDate must satisfy provided selectableDayPredicate');
-  assert(
-      initialDatePickerMode != null, 'initialDatePickerMode must not be null');
   // assert(context != null);
   // assert(debugCheckHasMaterialLocalizations(context));
 
   Widget child = _DatePickerCalendar(
-    initialDate: initialDate,
+    initialDates: initialDates,
     firstDate: firstDate,
     lastDate: lastDate,
     selectableDayPredicate: selectableDayPredicate,
-    initialDatePickerMode: initialDatePickerMode,
     selectedFormat: selectedFormat ?? "yyyy-mm-dd HH:nn:ss",
     hour24Format: hour24Format,
     showTimePicker: showTimePicker,
-    marker: marker,
-    events: events,
     onDaySelected: onDaySelected,
     convertToGregorian: convertToGregorian,
     initialTime: initialTime ?? TimeOfDay.now(),
