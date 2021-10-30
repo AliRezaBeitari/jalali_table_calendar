@@ -24,6 +24,10 @@ class _State extends State<MyApp> {
       body: Container(
         child: jalaliCalendar(
           context: context,
+          defaultDayDecoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+          ),
           onDaySelected: (date) {
             print(date);
           },

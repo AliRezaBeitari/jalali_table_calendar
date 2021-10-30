@@ -67,6 +67,7 @@ class CalendarDayPicker extends StatelessWidget {
     @required this.firstDate,
     @required this.lastDate,
     @required this.displayedMonth,
+    this.defaultDayDecoration,
     this.selectableDayPredicate,
   })  : assert(selectedDates != null),
         assert(currentDate != null),
@@ -96,6 +97,10 @@ class CalendarDayPicker extends StatelessWidget {
 
   /// The month whose days are displayed by this picker.
   final DateTime displayedMonth;
+
+
+  /// The default decoration for days.
+  final Decoration defaultDayDecoration;
 
   /// Optional user supplied predicate function to customize selectable days.
   final CalendarSelectableDayPredicate selectableDayPredicate;
@@ -271,7 +276,7 @@ class CalendarDayPicker extends StatelessWidget {
             (selectableDayPredicate != null &&
                 !selectableDayPredicate([dayToBuild]));
 
-        BoxDecoration decoration;
+        BoxDecoration decoration = defaultDayDecoration;
         TextStyle itemStyle = themeData.textTheme.bodyText1;
 
         final bool isSelectedDay = selectedPersianDates.any((d) =>
@@ -385,6 +390,7 @@ class CalendarMonthPicker extends StatefulWidget {
     @required this.onChanged,
     @required this.firstDate,
     @required this.lastDate,
+    this.defaultDayDecoration,
     this.selectableDayPredicate,
   })  : assert(selectedDates != null),
         assert(onChanged != null),
@@ -407,6 +413,9 @@ class CalendarMonthPicker extends StatefulWidget {
   /// The latest date the user is permitted to pick.
   final DateTime lastDate;
 
+  /// The default decoration for days.
+  final Decoration defaultDayDecoration;
+
   /// Optional user supplied predicate function to customize selectable days.
   final CalendarSelectableDayPredicate selectableDayPredicate;
 
@@ -424,7 +433,8 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void initState() {
     super.initState();
     // Initially display the pre-selected date.
-    final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
+    final int monthPage =
+        _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
     _dayPickerController = PageController(initialPage: monthPage);
     _handleMonthPageChanged(monthPage);
     _updateCurrentDate();
@@ -440,7 +450,8 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void didUpdateWidget(CalendarMonthPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(widget.selectedDates, oldWidget.selectedDates)) {
-      final int monthPage = _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
+      final int monthPage =
+          _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
       _dayPickerController = PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     }
@@ -514,6 +525,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
       firstDate: widget.firstDate,
       lastDate: widget.lastDate,
       displayedMonth: month,
+      defaultDayDecoration: widget.defaultDayDecoration,
       selectableDayPredicate: widget.selectableDayPredicate,
     );
   }
@@ -649,6 +661,7 @@ class _DatePickerCalendar extends StatefulWidget {
       this.initialDates,
       this.firstDate,
       this.lastDate,
+      this.defaultDayDecoration,
       this.selectableDayPredicate,
       this.selectedFormat,
       this.showTimePicker,
@@ -661,6 +674,7 @@ class _DatePickerCalendar extends StatefulWidget {
   final List<DateTime> initialDates;
   final DateTime firstDate;
   final DateTime lastDate;
+  final Decoration defaultDayDecoration;
   final CalendarSelectableDayPredicate selectableDayPredicate;
   final String selectedFormat;
   final bool convertToGregorian;
@@ -710,6 +724,7 @@ class _DatePickerCalendarState extends State<_DatePickerCalendar> {
       onChanged: _handleDayChanged,
       firstDate: widget.firstDate,
       lastDate: widget.lastDate,
+      defaultDayDecoration: widget.defaultDayDecoration,
       selectableDayPredicate: widget.selectableDayPredicate,
     );
   }
@@ -772,6 +787,7 @@ typedef CalendarSelectableDayPredicate = bool Function(List<DateTime> days);
 ///  * <https://material.google.com/components/pickers.html#pickers-date-pickers>
 Widget jalaliCalendar({
   @required BuildContext context,
+  Decoration defaultDayDecoration,
   CalendarSelectableDayPredicate selectableDayPredicate,
   String selectedFormat,
   bool toArray,
@@ -802,6 +818,7 @@ Widget jalaliCalendar({
     initialDates: initialDates,
     firstDate: firstDate,
     lastDate: lastDate,
+    defaultDayDecoration: defaultDayDecoration,
     selectableDayPredicate: selectableDayPredicate,
     selectedFormat: selectedFormat ?? "yyyy-mm-dd HH:nn:ss",
     hour24Format: hour24Format,
