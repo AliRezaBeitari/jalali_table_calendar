@@ -10,6 +10,8 @@ import 'package:jalali_table_calendar/src/persian_date.dart';
 bool calendarInitialized = false;
 //callback function when user change day
 typedef void OnDaySelected(DateTime day);
+//function which indicates whether a day is selected or not
+typedef bool IsDaySelected(DateTime day);
 
 const Duration _kMonthScrollDuration = Duration(milliseconds: 200);
 const double _kDayPickerRowHeight = 50.0;
@@ -61,7 +63,7 @@ class CalendarDayPicker extends StatelessWidget {
   /// Rarely used directly. Instead, typically used as part of a [CalendarMonthPicker].
   CalendarDayPicker({
     Key key,
-    @required this.selectedDates,
+    @required this.isSelected,
     @required this.currentDate,
     @required this.onChanged,
     @required this.firstDate,
@@ -69,19 +71,16 @@ class CalendarDayPicker extends StatelessWidget {
     @required this.displayedMonth,
     this.defaultDayDecoration,
     this.selectableDayPredicate,
-  })  : assert(selectedDates != null),
-        assert(currentDate != null),
+  })  : assert(currentDate != null),
         assert(onChanged != null),
         assert(displayedMonth != null),
         assert(!firstDate.isAfter(lastDate)),
-        assert(selectedDates.every(
-            (d) => d.isAfter(firstDate) || d.isAtSameMomentAs(firstDate))),
         super(key: key);
 
-  /// The list of currently selected dates.
+  /// The function which indicates if a day is selected or not.
   ///
   /// These dates are highlighted in the picker.
-  final List<DateTime> selectedDates;
+  final IsDaySelected isSelected;
 
   /// The current date at the time the picker is displayed.
   final DateTime currentDate;
@@ -233,13 +232,6 @@ class CalendarDayPicker extends StatelessWidget {
     final PersianDate getPearData =
         PersianDate.pDate(gregorian: displayedMonth.toString());
 
-    final List<PersianDate> selectedPersianDates = selectedDates
-        .map<PersianDate>((d) => PersianDate.pDate(gregorian: d.toString()))
-        .toList();
-
-    final PersianDate currentPDate =
-        PersianDate.pDate(gregorian: currentDate.toString());
-
     final List<Widget> labels = <Widget>[];
 
     var pDay = _digits(mDay, 2);
@@ -278,10 +270,8 @@ class CalendarDayPicker extends StatelessWidget {
         BoxDecoration decoration = defaultDayDecoration;
         TextStyle itemStyle = themeData.textTheme.bodyText1;
 
-        final bool isSelectedDay = selectedPersianDates.any((d) =>
-            d.year == getPearData.year &&
-            d.month == getPearData.month &&
-            d.day == day);
+        final List<int> dt = date.jalaliToGregorian(getPearData.year, getPearData.month, day);
+        final bool isSelectedDay = isSelected(DateTime(dt[0], dt[1], dt[2]));
 
         if (isSelectedDay) {
           // The selected day gets a circle background highlight, and a contrasting text color.
@@ -291,12 +281,6 @@ class CalendarDayPicker extends StatelessWidget {
         } else if (disabled) {
           itemStyle = themeData.textTheme.bodyText1
               .copyWith(color: themeData.disabledColor);
-        } else if (currentPDate.year == getPearData.year &&
-            currentPDate.month == getPearData.month &&
-            currentPDate.day == day) {
-          // The current day gets a different text color.
-          itemStyle = themeData.textTheme.bodyText2
-              .copyWith(color: themeData.colorScheme.secondary);
         } else if (getHoliday.isHoliday) {
           // The current day gets a different text color.
           itemStyle = themeData.textTheme.bodyText2.copyWith(color: Colors.red);
@@ -385,23 +369,20 @@ class CalendarMonthPicker extends StatefulWidget {
   /// by [showDatePicker].
   CalendarMonthPicker({
     Key key,
-    @required this.selectedDates,
+    @required this.isSelected,
     @required this.onChanged,
     @required this.firstDate,
     @required this.lastDate,
     this.defaultDayDecoration,
     this.selectableDayPredicate,
-  })  : assert(selectedDates != null),
-        assert(onChanged != null),
+  })  : assert(onChanged != null),
         assert(!firstDate.isAfter(lastDate)),
-        assert(selectedDates.every(
-            (d) => d.isAfter(firstDate) || d.isAtSameMomentAs(firstDate))),
         super(key: key);
 
-  /// The list of currently selected dates.
+  /// The function which indicate if a day is selected or not.
   ///
   /// These dates are highlighted in the picker.
-  final List<DateTime> selectedDates;
+  final IsDaySelected isSelected;
 
   /// Called when the user picks a month.
   final ValueChanged<DateTime> onChanged;
@@ -432,8 +413,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   void initState() {
     super.initState();
     // Initially display the pre-selected date.
-    final int monthPage =
-        _monthDelta(widget.firstDate, widget.selectedDates.first);
+    final int monthPage = _monthDelta(widget.firstDate, DateTime.now());
     _dayPickerController = PageController(initialPage: monthPage);
     _handleMonthPageChanged(monthPage);
     _updateCurrentDate();
@@ -448,12 +428,9 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   @override
   void didUpdateWidget(CalendarMonthPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(widget.selectedDates, oldWidget.selectedDates)) {
-      final int monthPage =
-          _monthDelta(widget.firstDate, widget.selectedDates.first);
-      _dayPickerController = PageController(initialPage: monthPage);
-      _handleMonthPageChanged(monthPage);
-    }
+    final int monthPage = _monthDelta(widget.firstDate, DateTime.now());
+    _dayPickerController = PageController(initialPage: monthPage);
+    _handleMonthPageChanged(monthPage);
   }
 
   MaterialLocalizations localizations;
@@ -518,7 +495,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
     // }
     calendarInitialized = true;
     return CalendarDayPicker(
-      selectedDates: widget.selectedDates,
+      isSelected: widget.isSelected,
       currentDate: _todayDate,
       onChanged: widget.onChanged,
       firstDate: widget.firstDate,
@@ -657,7 +634,7 @@ class _MonthPickerSortKey extends OrdinalSortKey {
 class _DatePickerCalendar extends StatefulWidget {
   const _DatePickerCalendar(
       {Key key,
-      this.initialDates,
+      this.isSelected,
       this.firstDate,
       this.lastDate,
       this.defaultDayDecoration,
@@ -670,7 +647,7 @@ class _DatePickerCalendar extends StatefulWidget {
       this.hour24Format})
       : super(key: key);
 
-  final List<DateTime> initialDates;
+  final IsDaySelected isSelected;
   final DateTime firstDate;
   final DateTime lastDate;
   final Decoration defaultDayDecoration;
@@ -689,37 +666,21 @@ class _DatePickerCalendar extends StatefulWidget {
 }
 
 class _DatePickerCalendarState extends State<_DatePickerCalendar> {
-  List<DateTime> _selectedDates;
   final GlobalKey _pickerKey = GlobalKey();
 
   MaterialLocalizations localizations;
   TextDirection textDirection;
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedDates = widget.initialDates;
-  }
-
   void _handleDayChanged(DateTime value) {
-    if (widget.onDaySelected != null) widget.onDaySelected(value);
-
-    final index = _selectedDates.indexWhere((d) =>
-        d.year == value.year && d.month == value.month && d.day == value.day);
-
-    setState(() {
-      if (index >= 0) {
-        _selectedDates.removeAt(index);
-      } else {
-        _selectedDates.add(value);
-      }
-    });
+    if (widget.onDaySelected != null) {
+      widget.onDaySelected(value);
+    }
   }
 
   Widget _buildWidget() {
     return CalendarMonthPicker(
       key: _pickerKey,
-      selectedDates: _selectedDates,
+      isSelected: widget.isSelected,
       onChanged: _handleDayChanged,
       firstDate: widget.firstDate,
       lastDate: widget.lastDate,
@@ -797,24 +758,12 @@ Widget jalaliCalendar({
   bool hour24Format = false,
   TimeOfDay initialTime,
   OnDaySelected onDaySelected,
-  List<DateTime> initialDates = const [],
+  @required DateTime firstDate,
+  @required DateTime lastDate,
+  @required IsDaySelected isSelected,
 }) {
-  DateTime firstDate = DateTime(1700);
-  DateTime lastDate = DateTime(2200);
-
-  assert(!initialDates.any((d) => d.isBefore(firstDate)),
-      'initialDate must be on or after firstDate');
-  assert(!initialDates.any((d) => d.isAfter(lastDate)),
-      'initialDate must be on or before lastDate');
-  assert(
-      !firstDate.isAfter(lastDate), 'lastDate must be on or after firstDate');
-  assert(selectableDayPredicate == null || selectableDayPredicate(initialDates),
-      'Provided initialDate must satisfy provided selectableDayPredicate');
-  // assert(context != null);
-  // assert(debugCheckHasMaterialLocalizations(context));
-
   Widget child = _DatePickerCalendar(
-    initialDates: initialDates,
+    isSelected: isSelected,
     firstDate: firstDate,
     lastDate: lastDate,
     defaultDayDecoration: defaultDayDecoration,
