@@ -98,7 +98,6 @@ class CalendarDayPicker extends StatelessWidget {
   /// The month whose days are displayed by this picker.
   final DateTime displayedMonth;
 
-
   /// The default decoration for days.
   final Decoration defaultDayDecoration;
 
@@ -434,7 +433,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
     super.initState();
     // Initially display the pre-selected date.
     final int monthPage =
-        _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
+        _monthDelta(widget.firstDate, widget.selectedDates.first);
     _dayPickerController = PageController(initialPage: monthPage);
     _handleMonthPageChanged(monthPage);
     _updateCurrentDate();
@@ -451,7 +450,7 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
     super.didUpdateWidget(oldWidget);
     if (!listEquals(widget.selectedDates, oldWidget.selectedDates)) {
       final int monthPage =
-          _monthDelta(widget.firstDate, widget.selectedDates.first) + 1;
+          _monthDelta(widget.firstDate, widget.selectedDates.first);
       _dayPickerController = PageController(initialPage: monthPage);
       _handleMonthPageChanged(monthPage);
     }
@@ -490,9 +489,9 @@ class _CalendarMonthPickerState extends State<CalendarMonthPicker>
   }
 
   static int _monthDelta(DateTime startDate, DateTime endDate) {
-    return (endDate.year - startDate.year) * 12 +
-        endDate.month -
-        startDate.month;
+    final PersianDate s = PersianDate.pDate(gregorian: startDate.toString());
+    final PersianDate e = PersianDate.pDate(gregorian: endDate.toString());
+    return (e.year - s.year) * 12 + e.month - s.month;
   }
 
   /// Add months to a month truncated date.
@@ -798,8 +797,8 @@ Widget jalaliCalendar({
   bool hour24Format = false,
   TimeOfDay initialTime,
   OnDaySelected onDaySelected,
+  List<DateTime> initialDates = const [],
 }) {
-  List<DateTime> initialDates = [DateTime.now()];
   DateTime firstDate = DateTime(1700);
   DateTime lastDate = DateTime(2200);
 
