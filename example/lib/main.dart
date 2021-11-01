@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:jalali_table_calendar/jalali_table_calendar.dart';
 
+extension DateTimeComparison on DateTime {
+  bool isSameOrAfter(DateTime dt) {
+    return this.isAtSameMomentAs(dt) || this.isAfter(dt);
+  }
+
+  bool isSameOrBefore(DateTime dt) {
+    return this.isAtSameMomentAs(dt) || this.isBefore(dt);
+  }
+}
+
 void main() {
   runApp(new MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -16,24 +26,29 @@ class MyApp extends StatefulWidget {
 class _State extends State<MyApp> {
   final currentYear = DateTime.now().year;
 
-  List ranges = [
-    [
-      DateTime.now(),
-      DateTime.now().add(Duration(days: 7)),
-    ],
-  ];
+  List ranges = [];
 
   @override
   void initState() {
     super.initState();
 
-    final now = DateTime.now();
-    final then = DateTime.now().add(Duration(days: 7));
+    final past = DateTime.now().subtract(Duration(days: 5));
+    final then = DateTime.now().add(Duration(days: 15));
 
     ranges = [
       [
-        now.subtract(Duration(hours: now.hour, minutes: now.minute, seconds: now.second, milliseconds: now.millisecond, microseconds: now.microsecond)),
-        then.subtract(Duration(hours: then.hour, minutes: then.minute, seconds: then.second, milliseconds: then.millisecond, microseconds: then.microsecond)),
+        past.subtract(Duration(
+            hours: past.hour,
+            minutes: past.minute,
+            seconds: past.second,
+            milliseconds: past.millisecond,
+            microseconds: past.microsecond)),
+        then.subtract(Duration(
+            hours: then.hour,
+            minutes: then.minute,
+            seconds: then.second,
+            milliseconds: then.millisecond,
+            microseconds: then.microsecond)),
       ],
     ];
   }
@@ -46,21 +61,75 @@ class _State extends State<MyApp> {
         centerTitle: true,
       ),
       body: Container(
-        child: jalaliCalendar(
-          context: context,
-          firstDate: DateTime(currentYear - 1),
-          lastDate: DateTime(currentYear + 2),
-          isSelected: _isSelected,
-          defaultDayDecoration: BoxDecoration(
-            color: Colors.green,
-            shape: BoxShape.circle,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                    secondary: Colors.red,
+                  )),
+          child: jalaliCalendar(
+            context: context,
+            firstDate: DateTime(currentYear - 1),
+            lastDate: DateTime(currentYear + 2),
+            isSelected: _isSelected,
+            defaultDayDecoration: BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+            onDaySelected: _onDaySelected,
           ),
-          onDaySelected: (date) {
-            print(date);
-          },
         ),
       ),
     );
+  }
+
+  void _onDaySelected(DateTime dt) {
+    if (ranges.isEmpty) {
+      // TODO: Assign [ranges] to newly created range
+      return;
+    }
+
+    final s = ranges.first[0] as DateTime;
+    if (dt.isBefore(s)) {
+      // Add (dt, dt) at 0
+      ranges.insert(0, [dt, dt]);
+
+      setState(() => {}); // Update UI
+      return;
+    }
+
+    final e = ranges.last[1] as DateTime;
+    if (dt.isAfter(e)) {
+      // Append (dt, dt) to ranges
+      ranges.add([dt, dt]);
+
+      setState(() => {}); // Update UI
+      return;
+    }
+
+    for (int i = 0; i < ranges.length; i++) {
+      final s = ranges[i][0] as DateTime;
+      final e = ranges[i][1] as DateTime;
+
+      if (dt.isSameOrAfter(s) && dt.isSameOrBefore(e)) {
+        // Split (s, e) using [dt] pivot
+        ranges[i] = [s, dt.subtract(Duration(days: 1))];
+        ranges.insert(i + 1, [dt.add(Duration(days: 1)), e]);
+
+        setState(() => {}); // Update UI
+        return;
+      }
+
+      if (i + 1 < ranges.length) {
+        final ns = ranges[i + 1][0] as DateTime;
+        if (dt.isAfter(e) && dt.isBefore(ns)) {
+          // Add (dt, dt) at i + 1
+          ranges.insert(i + 1, [dt, dt]);
+
+          setState(() => {}); // Update UI
+          return;
+        }
+      }
+    }
   }
 
   bool _isSelected(DateTime dt) {
@@ -68,12 +137,10 @@ class _State extends State<MyApp> {
       final s = r[0] as DateTime;
       final e = r[1] as DateTime;
 
-      print('dt: $dt \t s: $s \t e: $e');
-
-      if ((dt.isAtSameMomentAs(s) || dt.isAfter(s)) && (dt.isAtSameMomentAs(e) || dt.isBefore(e))) {
-        return true;
+      if (dt.isSameOrAfter(s) && dt.isSameOrBefore(e)) {
+        return false;
       }
     }
-    return false;
+    return true;
   }
 }
